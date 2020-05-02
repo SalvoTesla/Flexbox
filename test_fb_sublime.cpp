@@ -1,3 +1,11 @@
+#include <SoftwareSerial.h>
+
+//definisco pin RX e TX da Arduino verso modulo BT
+#define BT_TX_PIN 12
+#define BT_RX_PIN 11
+
+//istanzio oggetto SoftwareSerial (il nostro futuro bluetooth)
+SoftwareSerial bt =  SoftwareSerial(BT_RX_PIN, BT_TX_PIN);
 
 /// Out pin control *****************************
 #define fb_set_low    0x00  ///
@@ -17,8 +25,9 @@
 
 #define    _fb_rtx_cmd_adc     0x05
 
-//int baud_fb = 1000000;
-//int dbg_baud = 9600;
+
+
+#define timeout_rx 100
 
 
 
@@ -35,6 +44,7 @@ enum status
   OFF_3V = 0x00,
   ON_5V = 0x15,
   OFF_5V = 0x00
+  
 };
 
 enum fb_pin
@@ -111,24 +121,27 @@ CMD_TX var;
 
 typedef struct                  /// cmd send to PC/Flex
 {
-    
-    uint8_t len;                /// packet len for TX
-    uint8_t id;                 /// packet ID for TX
-    uint16_t B7_io1;          /// io 1
-    uint16_t B8_io2;          /// io 2
-    uint16_t B9_io3;          /// io 3
-    uint16_t B10_io4;         /// io 4
-    uint16_t B11_io5;         /// io 5
-    uint16_t B12_io6;         /// io 6
-    uint16_t B13_io7;         /// io 7
-    uint16_t B14_io8;         /// io 8
-    uint16_t A1_vecu;         /// a1, a2, a3 V_ECU
-    uint16_t A3_vign;         /// A4 V_IGN
-    uint16_t A5_ignd;         /// a5,a6 I_GND
-    uint16_t vout;            ///
-    uint16_t button;
-    uint16_t err;
-}__attribute__((packed)) CMD_RX;
+
+  uint8_t start_cmd;
+  uint8_t len;                /// packet len for TX
+  uint8_t id;                 /// packet ID for TX
+  uint16_t B7_io1;          /// io 1
+  uint16_t B8_io2;          /// io 2
+  uint16_t B9_io3;          /// io 3
+  uint16_t B10_io4;         /// io 4
+  uint16_t B11_io5;         /// io 5
+  uint16_t B12_io6;         /// io 6
+  uint16_t B13_io7;         /// io 7
+  uint16_t B14_io8;         /// io 8
+  uint16_t A1_vecu;         /// a1, a2, a3 V_ECU
+  uint16_t A3_vign;         /// A4 V_IGN
+  uint16_t A5_ignd;         /// a5,a6 I_GND
+  uint16_t vout;            ///
+  uint16_t button;
+  uint16_t err;
+  uint8_t crc;
+
+} __attribute__((packed)) CMD_RX;
 
 CMD_RX var_rx;
 /*************************************************************************************/
@@ -195,8 +208,9 @@ uint8_t crc8(uint8_t* buf, int size) {
 void setPin(fb_pin pin, status s) {
   *((uint8_t*)&var + pin) = s;
   var.A6_gnd = s;
-  
+
   cmd_tx(var);
+
 }
 /**************************************************************************************/
 
@@ -204,30 +218,50 @@ void setPin(fb_pin pin, status s) {
 /**********************************SEND_CMD****************************************************/
 
 void cmd_tx(CMD_TX var) {
-  Serial.flush();
+
   var.crc = crc8((uint8_t*)&var + 1, var.len);
   Serial1.write((uint8_t*)&var, sizeof(var));
-  
-  cmd_rx();
+
+  rx_status();
 }
 
 /**************************************************************************************/
 
-/**************************************************************************************/
-void cmd_rx(){
-  uint8_t temp[32];
-  uint8_t expected_len=0;
-  Serial.print("rx: ");
-  while(Serial1.available() < 32 || Serial1.read()!=0x0F); //TO FIX LOOP
-  for (int i = 0; i< 31 ; i++){
-    temp[i]=Serial1.read();
-    }
-    memcpy(&var_rx,temp,sizeof(var_rx));
-    Serial.print("memcpy: ");
-     Serial.println(var_rx.B7_io1);
-  }
+/*******************************RX_STATUS*******************************************************/
+void rx_status() {
 
-/**************************************************************************************/
+  uint8_t temp[33];
+  long previous = millis();
+  while (Serial1.available() < 33 /*|| Serial1.read() != 0x0F*/) {
+    if (millis() - previous > timeout_rx) {
+      break;
+    }
+  }
+  for (int i = 0; i < 32 ; i++) {
+    temp[i] = Serial1.read();
+  }
+  memcpy(&var_rx, temp, sizeof(var_rx));
+
+
+}
+
+/************************************PIN_STATUS**************************************************/
+
+void pinStatus(fb_pin pin) {
+  pin = pin-9;  //Offset (pin passato - posto su enum fb_pin)
+  if (pin >= 0 && pin < 10) {
+    //voltage = (*((uint8_t*)&var_rx + pin + 1) << 8) + (*((uint8_t*)&var_rx + pin));
+    uint16_t voltage = *((uint16_t *)&var_rx.B7_io1) + pin;
+    Serial.print(voltage/1000.000);
+    Serial.println(" V");
+    uint16_t current = *(uint16_t *)&var_rx.A5_ignd;
+     Serial.print(current/1000.000);
+     Serial.println(" A");
+    
+  }else if(pin > 9 ){
+     Serial.println("Not Supported Pin");
+    }
+}
 
 /******************************** LED-PORTB-SEQUENCE ******************************************************/
 void LedPortB_sequence(uint8_t time_on, uint8_t time_off) {
@@ -260,54 +294,72 @@ void LedPortB_sequence(uint8_t time_on, uint8_t time_off) {
 
 
 /**************************************************************************************/
+
+
+
+
+
+
 void setup() {
+  pinMode(BT_RX_PIN, INPUT);
+  pinMode(BT_TX_PIN, OUTPUT);
+  bt.begin(9600);
+
   Serial1.begin(1000000);
   Serial.begin(9600);
 
   Serial.println("Done");
-  
   setDefault();
-  
-  
-
-  /* uint8_t *pippo= (uint8_t*)&;
-    Serial.println("fb_pin");
-    Serial.println(*pippo, HEX);
-  */
-
-
-
-
-
-
 
 }
+
 int c;
 void loop() {
+ while (Serial.available() > 0) {
+    //mandali al modulo bluetooth
+    bt.print(Serial.read());
+  }
 
-  if (Serial.available() > 0) {
+  
+  while (bt.available() > 0) {
+    //mostrali nel Serial Monitor
+    int c=(bt.read());
 
-    c = Serial.read();
+    if(c!=10 && c!=13){
+    Serial.println(c);
+  
+
+
+
+  
+
+
+
+
+  //if (Serial.available() > 0) {
+
+   // c = Serial.read();
 
     if (c == 'q') {
       setDefault();
       Serial.println("Default settings");
-    } else if (c == 'n') {
-      setPin(_B7, ON_3V);
-    } else if (c == 'f') {
-      setPin(_B7, OFF_3V);
-    
+    } else if (c == 97/*'n'*/) {
+      setPin(_A1, ON_5V);
+      Serial.println("B7 ON");
+    } else if (c == 98/*'f'*/) {
+      setPin(_A1, OFF_3V);
+      Serial.println("B7 OFF");
     } else if (c == 'h') {
       Serial.println("crc");
       Serial.println(crc8((uint8_t*)&var + 1, var.len), HEX);
     } else if (c == 'z') {
       LedPortB_sequence(50, 5);
     } else if (c == 'p') {
-      cmd_rx();
-      
-    }
+      rx_status();
+    } else if (c == 'o') {
+      pinStatus(_A1);
+    }}
+
+    //delay(10);
   }
-
-  delay(10);
-
 }
