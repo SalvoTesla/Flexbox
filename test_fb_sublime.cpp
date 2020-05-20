@@ -134,7 +134,7 @@ typedef struct                  /// cmd send to PC/Flex
   uint16_t B13_io7;         /// io 7
   uint16_t B14_io8;         /// io 8
   uint16_t A1_vecu;         /// a1, a2, a3 V_ECU
-  uint16_t A3_vign;         /// A4 V_IGN
+  uint16_t A4_vign;         /// A4 V_IGN
   uint16_t A5_ignd;         /// a5,a6 I_GND
   uint16_t vout;            ///
   uint16_t button;
@@ -146,12 +146,6 @@ typedef struct                  /// cmd send to PC/Flex
 CMD_RX var_rx;
 /*************************************************************************************/
 
-
-
-typedef struct {
-
-
-}__attribute__((packed))tempCmd;
 
 
 
@@ -229,7 +223,6 @@ void cmd_tx(CMD_TX var) {
 
   var.crc = crc8((uint8_t*)&var + 1, var.len);
   Serial.write((uint8_t*)&var, sizeof(var));
-  //rx_status();
 }
 
 /**************************************************************************************/
@@ -252,14 +245,15 @@ void rx_status() {
 
 }
 
-/************************************PIN_STATUS**************************************************/
+/************************************GET_PIN_VOLTAGE**************************************************/
 
-int pinVoltage(fb_pin pin) {
+float getPinVoltage(fb_pin pin) {
   pin = pin-6;  //Offset (pin passato - posto su enum fb_pin)
-  if (pin >= 0 && pin < 10) {
     //voltage = (*((uint8_t*)&var_rx + pin + 1) << 8) + (*((uint8_t*)&var_rx + pin));
+    bt.print("pin: ");
+    bt.println(var_rx.B7_io1);
     uint16_t voltage = *((uint16_t *)&var_rx.B7_io1) + pin;
-    return voltage /1000.000;
+    return voltage/1000.000;
     //Serial.print(voltage/1000.000);
     //Serial.println(" V");
   //  uint16_t current = *(uint16_t *)&var_rx.A5_ignd;
@@ -268,7 +262,7 @@ int pinVoltage(fb_pin pin) {
     
  // }else if(pin > 9 ){
   //   Serial.println("Not Supported Pin");
-    }
+    
 }
 
 /******************************** LED-PORTB-SEQUENCE ******************************************************/
@@ -304,7 +298,10 @@ void LedPortB_sequence(uint8_t time_on, uint8_t time_off) {
 /**************************************************************************************/
 
 
-
+void getValueVoltage(fb_pin c){
+  bt.print(*((uint16_t *)&var_rx) + c);
+  
+  }
 
 
 
@@ -318,46 +315,50 @@ void setup() {
 Serial.begin(1000000);
   Serial.println("Done");
   setDefault();
+}
 
+int c = 0;
+long int now = 0;
+long int previous = 0;
+void loop() {
+
+
+ c=(bt.read());
+  
+   now = millis();
+   if (now - previous > 1000) {
+      previous = now;
+      cmd_tx(var);
+     bt.println("1_sec");
+     getValueVoltage(c);
+      
 }
 
 
+// Continua a leggere da HC-05 e invia Serial Monitor Arduino
+  //if (bt.available())
+   // Serial.write(bt.read());
 
-
-
-
-//int c='q';
-
-  
-
-
-int c;
-void loop() {
- //while (Serial.available() > 0) {
-    //mandali al modulo bluetooth
-  //  bt.print(Serial.read());
-  
+  // Continua a leggere da Arduino Serial Monitor e invia a HC-05
+ // if (Serial.available())
+  //  bt.write(Serial.read());
 
   
-  //while (bt.available() > 0) {
-    //mostrali nel Serial Monitor
-     c=(bt.read());
+    
 
-   // if(c!=10 && c!=13){
-   // Serial.println("banana");
+     
+    
+      
+    
   
-
-//repeat(Serial.read());
-
-
 
 if (c == 'q') {
       setDefault();
       Serial.println("Default settings");
-    } else if (c == 'a'/*'n'*/) {
-      setPin(_B7, ON_5V);
+    } else if (c == 'a') {
+      setPin(_B7, ON_3V);
       //Serial.println("B7 ON");
-    } else if (c == 'b'/*'f'*/) {
+    } else if (c == 'b') {
       setPin(_B7, OFF);
       //Serial.println("B7 OFF");
     } else if (c == 'h') {
@@ -368,25 +369,15 @@ if (c == 'q') {
     } else if (c == 'p') {
       rx_status();
     } else if (c == 'o') {
-      bt.print(pinVoltage(_B7));
+      bt.print(getPinVoltage(_B7));
   }
-
-//repeat(bt.read());
-//cmd_tx(var);
-//rx_status();
-
-
   
+ 
+  
+   
 
 
 
 
-  //if (Serial.available() > 0) {
- //c = Serial.read();
-      
-
-    //}
-
-    //delay(10);
   }
-   //}
+  
