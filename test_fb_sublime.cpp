@@ -223,6 +223,9 @@ void cmd_tx(CMD_TX var) {
 
   var.crc = crc8((uint8_t*)&var + 1, var.len);
   Serial.write((uint8_t*)&var, sizeof(var));
+
+rx_status();
+  
 }
 
 /**************************************************************************************/
@@ -230,20 +233,26 @@ void cmd_tx(CMD_TX var) {
 /*******************************RX_STATUS*******************************************************/
 void rx_status() {
 
-  uint8_t temp[33];
+ 
+ static uint8_t temp[33];
+  //bt.println("sto leggendo");
   long previous = millis();
-  while (Serial.available() < 33 /*|| Serial1.read() != 0x0F*/) {
+  while (Serial.available() < 33) {
     if (millis() - previous > timeout_rx) {
       break;
     }
   }
   for (int i = 0; i < 32 ; i++) {
     temp[i] = Serial.read();
+    //bt.println(temp[i],HEX);
   }
+
   memcpy(&var_rx, temp, sizeof(var_rx));
 
 
 }
+
+
 
 /************************************GET_PIN_VOLTAGE**************************************************/
 
@@ -251,8 +260,9 @@ float getPinVoltage(fb_pin pin) {
   pin = pin-6;  //Offset (pin passato - posto su enum fb_pin)
     //voltage = (*((uint8_t*)&var_rx + pin + 1) << 8) + (*((uint8_t*)&var_rx + pin));
     bt.print("pin: ");
-    bt.println(var_rx.B7_io1);
+    //bt.println(var_rx.B7_io1);
     uint16_t voltage = *((uint16_t *)&var_rx.B7_io1) + pin;
+    bt.println(voltage);
     return voltage/1000.000;
     //Serial.print(voltage/1000.000);
     //Serial.println(" V");
@@ -313,26 +323,28 @@ void setup() {
   //Serial1.begin(1000000);
   //Serial.begin(9600);
 Serial.begin(1000000);
-  Serial.println("Done");
+  bt.println("Done");
   setDefault();
 }
 
 int c = 0;
 long int now = 0;
 long int previous = 0;
+
+
+
 void loop() {
 
 
  c=(bt.read());
-  
-   now = millis();
+  /* now = millis();
    if (now - previous > 1000) {
       previous = now;
       cmd_tx(var);
      bt.println("1_sec");
-     getValueVoltage(c);
+    // getPinVoltage(c);
       
-}
+}*/
 
 
 // Continua a leggere da HC-05 e invia Serial Monitor Arduino
@@ -368,9 +380,17 @@ if (c == 'q') {
       LedPortB_sequence(30, 5);
     } else if (c == 'p') {
       rx_status();
-    } else if (c == 'o') {
-      bt.print(getPinVoltage(_B7));
-  }
+   // } else if (c == 'o') {
+      //bt.println((uint16_t*)&var_rx, sizeof(var));
+  }/*else if(c == 'l'){
+    for(int i=0;i=sizeof(var_rx);i++){
+      bt.println()
+
+
+      bt.println("1_sec");
+      }*/
+    
+    
   
  
   
