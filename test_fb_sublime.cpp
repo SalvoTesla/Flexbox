@@ -230,25 +230,14 @@ rx_status();
 
 /**************************************************************************************/
 
-/*******************************RX_STATUS*******************************************************/
+/*******************************RX_STATUS*******************************************************/   //FIX ME CHANGE NAME
+
+
 void rx_status() {
 
- 
  static uint8_t temp[33];
-  //bt.println("sto leggendo");
-  long previous = millis();
-  while (Serial.available() < 33) {
-    if (millis() - previous > timeout_rx) {
-      break;
-    }
-  }
-  for (int i = 0; i < 32 ; i++) {
-    temp[i] = Serial.read();
-    //bt.println(temp[i],HEX);
-  }
-
+ Serial.readBytesUntil(0x0F,temp,32);
   memcpy(&var_rx, temp, sizeof(var_rx));
-
 
 }
 
@@ -258,22 +247,18 @@ void rx_status() {
 
 float getPinVoltage(fb_pin pin) {
   pin = pin-6;  //Offset (pin passato - posto su enum fb_pin)
-    //voltage = (*((uint8_t*)&var_rx + pin + 1) << 8) + (*((uint8_t*)&var_rx + pin));
-    bt.print("pin: ");
-    //bt.println(var_rx.B7_io1);
     uint16_t voltage = *((uint16_t *)&var_rx.B7_io1) + pin;
-    bt.println(voltage);
-    return voltage/1000.000;
-    //Serial.print(voltage/1000.000);
-    //Serial.println(" V");
-  //  uint16_t current = *(uint16_t *)&var_rx.A5_ignd;
-    // Serial.print(current/1000.000);
-//Serial.println(" A");
-    
- // }else if(pin > 9 ){
-  //   Serial.println("Not Supported Pin");
-    
+    return (bitSwap16(voltage)/1000.000)-0.84;
 }
+
+/************************************BIT-SWAP**************************************************/
+
+uint16_t bitSwap16(uint16_t a)
+{
+  a = ((a & 0x00FF) << 8) | ((a & 0xFF00) >> 8);
+  return a;
+}
+
 
 /******************************** LED-PORTB-SEQUENCE ******************************************************/
 void LedPortB_sequence(uint8_t time_on, uint8_t time_off) {
@@ -319,9 +304,6 @@ void setup() {
   pinMode(BT_RX_PIN, INPUT);
   pinMode(BT_TX_PIN, OUTPUT);
   bt.begin(9600);
-
-  //Serial1.begin(1000000);
-  //Serial.begin(9600);
 Serial.begin(1000000);
   bt.println("Done");
   setDefault();
@@ -337,14 +319,14 @@ void loop() {
 
 
  c=(bt.read());
-  /* now = millis();
+   now = millis();
    if (now - previous > 1000) {
       previous = now;
       cmd_tx(var);
-     bt.println("1_sec");
+    // bt.println("1_sec");
     // getPinVoltage(c);
       
-}*/
+}
 
 
 // Continua a leggere da HC-05 e invia Serial Monitor Arduino
@@ -354,15 +336,6 @@ void loop() {
   // Continua a leggere da Arduino Serial Monitor e invia a HC-05
  // if (Serial.available())
   //  bt.write(Serial.read());
-
-  
-    
-
-     
-    
-      
-    
-  
 
 if (c == 'q') {
       setDefault();
@@ -380,24 +353,9 @@ if (c == 'q') {
       LedPortB_sequence(30, 5);
     } else if (c == 'p') {
       rx_status();
-   // } else if (c == 'o') {
-      //bt.println((uint16_t*)&var_rx, sizeof(var));
-  }/*else if(c == 'l'){
-    for(int i=0;i=sizeof(var_rx);i++){
-      bt.println()
-
-
-      bt.println("1_sec");
-      }*/
+    } else if (c == 'o') {
+      bt.println(getPinVoltage(_B7));
+  }
     
-    
-  
- 
-  
-   
-
-
-
-
   }
   
