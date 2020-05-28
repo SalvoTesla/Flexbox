@@ -38,12 +38,11 @@ SoftwareSerial bt =  SoftwareSerial(BT_RX_PIN, BT_TX_PIN);
 
 enum status
 {
-  OFF = 0x00,
+  OFF = 0x02,
   LED_ON = 0x10,
   ON_3V = 0x11,
- // OFF_3V = 0x00,
   ON_5V = 0x15,
- // OFF_5V = 0x00
+  VCC_ON = 0x15
   
 };
 
@@ -210,7 +209,6 @@ uint8_t crc8(uint8_t* buf, int size) {
 void setPin(fb_pin pin, status s) {
   *((uint8_t*)&var + pin) = s;
   var.A6_gnd = s;
-
   cmd_tx(var);
 
 }
@@ -220,11 +218,9 @@ void setPin(fb_pin pin, status s) {
 /**********************************SEND_CMD****************************************************/
 
 void cmd_tx(CMD_TX var) {
-
   var.crc = crc8((uint8_t*)&var + 1, var.len);
   Serial.write((uint8_t*)&var, sizeof(var));
-
-rx_status();
+getRxStatus();
   
 }
 
@@ -233,8 +229,7 @@ rx_status();
 /*******************************RX_STATUS*******************************************************/   //FIX ME CHANGE NAME
 
 
-void rx_status() {
-
+void getRxStatus() {
  static uint8_t temp[33];
  Serial.readBytesUntil(0x0F,temp,32);
   memcpy(&var_rx, temp, sizeof(var_rx));
@@ -245,10 +240,21 @@ void rx_status() {
 
 /************************************GET_PIN_VOLTAGE**************************************************/
 
-float getPinVoltage(fb_pin pin) {
-  pin = pin-6;  //Offset (pin passato - posto su enum fb_pin)
-    uint16_t voltage = *((uint16_t *)&var_rx.B7_io1) + pin;
-    return (bitSwap16(voltage)/1000.000)-0.84;
+uint16_t getPinVoltage(fb_pin pin) {
+   uint8_t a = pin-9;  //Offset (pin passato - posto su enum fb_pin)
+    uint16_t voltage = *(uint16_t*)&var_rx.B7_io1 + a;
+   //bt.println(bitSwap16(voltage));
+   return bitSwap16(voltage);
+
+}
+
+
+/************************************GET_PIN_CURRENT**************************************************/
+
+void getPinCurrent(fb_pin pin) {
+   //int a = pin-6;  //Offset (pin passato - posto su enum fb_pin)
+    uint16_t current = *(uint16_t*)&var_rx.A5_ignd;
+   bt.println(bitSwap16(current));
 }
 
 /************************************BIT-SWAP**************************************************/
@@ -292,12 +298,10 @@ void LedPortB_sequence(uint8_t time_on, uint8_t time_off) {
 
 /**************************************************************************************/
 
+void getDataBluetooth(uint8_t data){
 
-void getValueVoltage(fb_pin c){
-  bt.print(*((uint16_t *)&var_rx) + c);
-  
-  }
-
+  data = bt.read();
+}
 
 
 void setup() {
@@ -323,6 +327,7 @@ void loop() {
    if (now - previous > 1000) {
       previous = now;
       cmd_tx(var);
+      bt.println(var_rx.A1_vecu,HEX);
     // bt.println("1_sec");
     // getPinVoltage(c);
       
@@ -339,22 +344,22 @@ void loop() {
 
 if (c == 'q') {
       setDefault();
-      Serial.println("Default settings");
+      //Serial.println("Default settings");
     } else if (c == 'a') {
-      setPin(_B7, ON_3V);
-      //Serial.println("B7 ON");
+      setPin(_A1, VCC_ON);
     } else if (c == 'b') {
-      setPin(_B7, OFF);
-      //Serial.println("B7 OFF");
+      setPin(_A1, OFF);
     } else if (c == 'h') {
       Serial.println("crc");
       Serial.println(crc8((uint8_t*)&var + 1, var.len), HEX);
     } else if (c == 'z') {
       LedPortB_sequence(30, 5);
     } else if (c == 'p') {
-      rx_status();
-    } else if (c == 'o') {
-      bt.println(getPinVoltage(_B7));
+      getRxStatus();
+    } else if (c == 'o') {  
+      bt.println(getPinVoltage(_A1), HEX);
+  }else if (c == 'i') {
+      getPinCurrent(_A5);
   }
     
   }
